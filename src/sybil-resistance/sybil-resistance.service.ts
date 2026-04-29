@@ -241,6 +241,43 @@ Final score: ${Number(composite.toFixed(4))} (weighted average)`,
   }
 
   /**
+   * Get the most recent Sybil scores for multiple users in a single query
+   */
+  async getLatestSybilScores(userIds: string[]): Promise<Map<string, any>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+
+    const uniqueUserIds = [...new Set(userIds)];
+
+    // Batch fetch all scores ordered by newest first
+    const scores = await this.prisma.sybilScore.findMany({
+      where: { userId: { in: uniqueUserIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const latestByUser = new Map<string, any>();
+    for (const score of scores) {
+      if (!latestByUser.has(score.userId)) {
+        latestByUser.set(score.userId, score);
+      }
+    }
+
+    // Compute missing scores in parallel
+    const missingUserIds = uniqueUserIds.filter((id) => !latestByUser.has(id));
+    if (missingUserIds.length > 0) {
+      const computedScores = await Promise.all(
+        missingUserIds.map((userId) => this.recordSybilScore(userId)),
+      );
+      for (let i = 0; i < missingUserIds.length; i++) {
+        latestByUser.set(missingUserIds[i], computedScores[i]);
+      }
+    }
+
+    return latestByUser;
+  }
+
+  /**
    * Get all Sybil score history for a user
    */
   async getSybilScoreHistory(userId: string, limit: number = 10): Promise<any[]> {
