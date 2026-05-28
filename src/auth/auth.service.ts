@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { verifyMessage } from 'ethers';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +9,8 @@ import { RedisService } from '../redis/redis.service';
 export class AuthService {
   private readonly NONCE_TTL_SECONDS = 5 * 60; // 5 minutes
 
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -18,12 +20,21 @@ export class AuthService {
   /**
    * Generate a nonce challenge for a wallet address
    */
-  generateChallenge(address: string): string {
+  async generateChallenge(address: string): Promise<string> {
     const nonce = this.generateRandomNonce();
     // Persist nonce to Redis with TTL to allow scaling across instances
     const key = `auth:nonce:${address.toLowerCase()}`;
-    // best-effort: set in redis, but don't block if redis unavailable
-    this.redisService.set(key, nonce, this.NONCE_TTL_SECONDS).catch(() => null);
+
+    try {
+      const ok = await this.redisService.set(key, nonce, this.NONCE_TTL_SECONDS);
+      if (!ok) {
+        this.logger.error(`Failed to persist nonce for ${address}`);
+        throw new InternalServerErrorException('Failed to generate challenge. Please try again later.');
+      }
+    } catch (err) {
+      this.logger.error(`Error persisting nonce for ${address}: ${err?.message ?? err}`);
+      throw new InternalServerErrorException('Failed to generate challenge. Please try again later.');
+    }
 
     return `Sign in to TruthBounty: ${nonce}`;
   }

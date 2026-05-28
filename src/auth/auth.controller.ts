@@ -18,7 +18,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get a challenge message to sign with your wallet' })
   @ApiResponse({ status: 200, description: 'Challenge message generated' })
   async getChallenge(@Body() dto: ChallengeDto) {
-    const message = this.authService.generateChallenge(dto.address);
+    const message = await this.authService.generateChallenge(dto.address);
     return { message, address: dto.address };
   }
 
