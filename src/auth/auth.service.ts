@@ -4,7 +4,7 @@ import { verifyMessage } from 'ethers';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 
-interface NonceRecord {
+export interface NonceRecord {
   nonce: string;
   createdAt: number;
 }
