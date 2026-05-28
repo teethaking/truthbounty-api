@@ -63,3 +63,12 @@ model SybilScore {
   @@index([userId])
   @@index([compositeScore])
 }
+
+model SybilExplanation {
+  id           String   @id @default(uuid())
+  sybilScoreId String   @unique
+  explanation  String
+  createdAt    DateTime @default(now())
+
+  sybilScore SybilScore @relation(fields: [sybilScoreId], references: [id], onDelete: Cascade)
+}
